@@ -120,3 +120,4 @@ def get_product_details(product_name: str):
 # ListOfProducts = get_product_details(strProductName)
 # json_string = json.dumps(ListOfProducts)
 # print(json_string)
+
