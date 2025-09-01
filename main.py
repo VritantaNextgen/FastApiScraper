@@ -107,7 +107,8 @@ def get_product_details(product_name: str):
 
 
                     ListOfProducts.append({"name": Product_Name, "price": Product_Price, "rating": Product_Rating, "reviews": Product_Review, "image_url": Product_Image_Link, "description": Product_Description})
-
+                    
+        driver.quit()
         return ListOfProducts
 
     except Exception as e:
@@ -120,4 +121,5 @@ def get_product_details(product_name: str):
 # ListOfProducts = get_product_details(strProductName)
 # json_string = json.dumps(ListOfProducts)
 # print(json_string)
+
 
