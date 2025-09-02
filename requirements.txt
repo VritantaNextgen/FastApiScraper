@@ -2,4 +2,5 @@ requests
 selenium
 fastapi
 uvicorn
+beautifulsoup4
 pydantic
