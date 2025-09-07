@@ -1,21 +1,19 @@
-import requests
-from bs4 import BeautifulSoup
-import re
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import traceback
 import sys
+import re
+import time
 
 app = FastAPI()
-
-
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
 
 class ProductRequest(BaseModel):
     product_name: str
-
 
 @app.post("/scrape/")
 async def scrape_product_post(product_request: ProductRequest):
@@ -26,62 +24,83 @@ async def scrape_product_post(product_request: ProductRequest):
 
 def get_product_details(product_name: str):
     try:
+        # Selenium Chrome options
+        chrome_options = Options()
+        chrome_options.add_argument("--headless=new")  # Headless mode
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                    "Chrome/115.0.0.0 Safari/537.36")
+
+        driver = webdriver.Chrome(options=chrome_options)
+
         url = f"https://www.flipkart.com/search?q={product_name}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
-        }
+        driver.get(url)
 
-        response = requests.get(url, headers=headers)
-        html_content = response.text
-        print("Status Code:", response.status_code)
-        print("Final URL:", response.url)  # In case of redirects
-        print("First 1000 chars of HTML:\n", html_content[:1000])
+        debug_filename = f"debug_flipkart_{product_name.replace(' ', '_')}.html"
+        with open(debug_filename, "w", encoding="utf-8") as f:
+            f.write(driver.page_source)
+        print(f"[DEBUG] Saved page HTML to {debug_filename}")
 
-        with open("debug_flipkart.html", "w", encoding="utf-8") as f:
-            f.write(html_content)
-
-        # If you need to reference the existing HTML file, uncomment the following line:
-        # with open('flipkart_page.html', 'r', encoding='utf-8') as file:
-        #     html_content = file.read()
-
-        soup = BeautifulSoup(html_content, 'html.parser')
-
-        # Find all product cards
-        # (Note: The class 'product-card' may need to be adjusted based on actual HTML)
-        products = soup.find_all('div', class_='tUxRFH')
+        # Wait for page to load
+        time.sleep(3)
 
         product_data = []
+
+        # Find all product cards by XPath (original class 'tUxRFH')
+        products = driver.find_elements(By.XPATH, "//div[contains(@class,'tUxRFH')]")
+
         for product in products:
-            # Extract Name
-            # This assumes the structure from the flipkart_page.html reference
-            name_element = product.find('div', class_='KzDlHZ')
-            name = name_element.text.strip() if name_element else 'Name not found'
-            
-            # Extract Rating and Reviews
-            rating_element = product.find('div', class_='XQDdHH')
-            reviews_element = product.find('div', class_='_5OesEi')
-            
-            rating = rating_element.text.strip() if rating_element else 'Rating not found'
-            reviews_re = re.findall(r'\xa0(\d+\s*Reviews)', reviews_element.text.strip())
-            reviews = reviews_re if len(reviews_re)>0 else 'Reviews not found'
-            
-            # Extract Price
-            price_element = product.find('div', class_='Nx9bqj _4b5DiR')
-            price = price_element.text.strip() if price_element else 'Price not found'
-            
-            # Extract Description
-            description_elements = product.find_all('li', class_='J+igdf')
-            description = ' '.join([elem.text.strip() for elem in description_elements]) if description_elements else 'Description not found'
+            try:
+                # Name
+                try:
+                    name = product.find_element(By.XPATH, ".//div[contains(@class,'KzDlHZ')]").text.strip()
+                except:
+                    name = "Name not found"
 
-            product_data.append({
-                'name': name,
-                'reviews': reviews,
-                'rating': rating,
-                'price': price,
-                'description': description
-            })
+                # Rating
+                try:
+                    rating = product.find_element(By.XPATH, ".//div[contains(@class,'XQDdHH')]").text.strip()
+                except:
+                    rating = "Rating not found"
 
+                # Reviews
+                try:
+                    reviews_text = product.find_element(By.XPATH, ".//div[contains(@class,'_5OesEi')]").text.strip()
+                    reviews_re = re.findall(r'(\d+\s*Reviews)', reviews_text)
+                    reviews = reviews_re[0] if len(reviews_re)>0 else "Reviews not found"
+                except:
+                    reviews = "Reviews not found"
+
+                # Price
+                try:
+                    price = product.find_element(By.XPATH, ".//div[contains(@class,'Nx9bqj')]").text.strip()
+                except:
+                    price = "Price not found"
+
+                # Description
+                try:
+                    desc_elements = product.find_elements(By.XPATH, ".//li[contains(@class,'J+igdf')]")
+                    description = " ".join([d.text.strip() for d in desc_elements]) if desc_elements else "Description not found"
+                except:
+                    description = "Description not found"
+
+                product_data.append({
+                    "name": name,
+                    "reviews": reviews,
+                    "rating": rating,
+                    "price": price,
+                    "description": description
+                })
+
+            except Exception as inner_e:
+                print(f"Error parsing product: {inner_e}")
+
+        driver.quit()
         return product_data
+
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         line_number = exc_traceback.tb_lineno
@@ -89,7 +108,7 @@ def get_product_details(product_name: str):
         error_message = str(e)
         print(f"Error: {error_message} (Type: {exc_type.__name__})")
         print(f"Occurred in file: {file_name}, line: {line_number}")
-        # Optional: print full traceback
         traceback.print_exc()
         return None
+    
 
