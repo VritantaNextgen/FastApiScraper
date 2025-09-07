@@ -33,6 +33,12 @@ def get_product_details(product_name: str):
 
         response = requests.get(url, headers=headers)
         html_content = response.text
+        print("Status Code:", response.status_code)
+        print("Final URL:", response.url)  # In case of redirects
+        print("First 1000 chars of HTML:\n", html_content[:1000])
+
+        with open("debug_flipkart.html", "w", encoding="utf-8") as f:
+            f.write(html_content)
 
         # If you need to reference the existing HTML file, uncomment the following line:
         # with open('flipkart_page.html', 'r', encoding='utf-8') as file:
