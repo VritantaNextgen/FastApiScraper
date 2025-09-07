@@ -56,7 +56,8 @@ def get_product_details(product_name: str):
             reviews_element = product.find('div', class_='_5OesEi')
             
             rating = rating_element.text.strip() if rating_element else 'Rating not found'
-            reviews = re.findall(r'\xa0(\d+\s*Reviews)', reviews_element.text.strip())[0] if reviews_element else 'Reviews not found'
+            reviews_re = re.findall(r'\xa0(\d+\s*Reviews)', reviews_element.text.strip())
+            reviews = reviews_re if len(reviews_re)>0 else 'Reviews not found'
             
             # Extract Price
             price_element = product.find('div', class_='Nx9bqj _4b5DiR')
@@ -85,5 +86,4 @@ def get_product_details(product_name: str):
         # Optional: print full traceback
         traceback.print_exc()
         return None
-
 
