@@ -8,6 +8,7 @@ import traceback
 import sys
 import re
 import time
+import tempfile
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -33,6 +34,10 @@ def get_product_details(product_name: str):
         chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                                     "Chrome/115.0.0.0 Safari/537.36")
+        # ✅ Create a unique temporary profile directory
+        user_data_dir = tempfile.mkdtemp()
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+
 
         driver = webdriver.Chrome(options=chrome_options)
 
